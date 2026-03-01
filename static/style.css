@@ -25,13 +25,19 @@ html, body {
 /* ── Status bar ───────────────────────────────────────── */
 .status-bar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 16px 10px;
   background: var(--surface);
   border-bottom: 1px solid rgba(255,255,255,0.08);
   flex-shrink: 0;
   z-index: 10;
+}
+
+.status-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .logo {
@@ -62,6 +68,58 @@ html, body {
 @keyframes pulse-green {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.4; }
+}
+
+/* ── Wake word indicator ──────────────────────────────── */
+.wake-indicator {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: color 0.3s;
+}
+
+.wake-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+
+/* idle — gray, no animation */
+.wake-indicator.idle .wake-dot { background: var(--text-muted); }
+
+/* listening — green pulsing */
+.wake-indicator.listening { color: var(--green); }
+.wake-indicator.listening .wake-dot {
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: pulse-green 1.5s infinite;
+}
+
+/* command — cyan fast pulse (waiting for user's command) */
+.wake-indicator.command { color: var(--accent); }
+.wake-indicator.command .wake-dot {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: wake-fast-pulse 0.6s infinite;
+}
+
+/* processing — yellow steady */
+.wake-indicator.processing { color: #ffd166; }
+.wake-indicator.processing .wake-dot {
+  background: #ffd166;
+  box-shadow: 0 0 6px #ffd166;
+  animation: wake-fast-pulse 0.4s infinite;
+}
+
+@keyframes wake-fast-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.8); }
 }
 
 /* ── Viewfinder ───────────────────────────────────────── */

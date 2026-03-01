@@ -19,6 +19,8 @@ const scanningOverlay     = document.getElementById("scanning-overlay");
 const privacyAlert        = document.getElementById("privacy-alert");
 const privacyAlertDetail  = document.getElementById("privacy-alert-detail");
 const privacyAlertDismiss = document.getElementById("privacy-alert-dismiss");
+const wakeIndicator       = document.getElementById("wake-indicator");
+const wakeLabel           = document.getElementById("wake-label");
 
 // ── iOS Audio unlock ───────────────────────────────────────────────────────
 // iOS blocks audio unless .play() is called on the SAME element that was
@@ -40,6 +42,8 @@ function unlockAudio() {
     audioEl.volume = 1;
     audioEl.src = "";
     audioUnlocked = true;
+    // Start wake word listening now that audio is unlocked
+    startWakeWordListening();
   }).catch(() => {
     // Unlock failed silently — will retry on next tap
   });
@@ -135,6 +139,10 @@ async function analyzeSnapshot(query) {
   } finally {
     isAnalyzing = false;
     snapBtn.disabled = false;
+    // Restart wake word if it went quiet during analysis
+    if (audioUnlocked && !wakeListening && !micBtn.classList.contains("listening")) {
+      setTimeout(startWakeWordListening, 800);
+    }
   }
 }
 
@@ -239,7 +247,12 @@ function setupSpeechRecognition() {
     micBtn.classList.remove("listening");
     micBtn.setAttribute("aria-label", "Use microphone to speak your query");
     const q = queryInput.value.trim();
-    if (q) analyzeSnapshot(q);
+    if (q) {
+      analyzeSnapshot(q); // finally block will restart wake word
+    } else {
+      // No query captured — restart wake word immediately
+      if (audioUnlocked) startWakeWordListening();
+    }
   };
 }
 
@@ -250,6 +263,7 @@ micBtn.addEventListener("click", () => {
   if (micBtn.classList.contains("listening")) {
     recognition.stop();
   } else {
+    stopWakeWordListening();               // pause wake word while manual mic is active
     recognition.start();
   }
 });
@@ -324,6 +338,141 @@ function hidePrivacyAlert() {
 }
 
 privacyAlertDismiss.addEventListener("click", hidePrivacyAlert);
+
+// ── Wake Word Engine ────────────────────────────────────────────────────────
+let wakeListening    = false;
+let awaitingCommand  = false;
+let wakeRecognition  = null;
+let wakeRestartTimer = null;
+
+function setWakeState(state) {
+  wakeIndicator.className = `wake-indicator ${state}`;
+  if (state === "idle") {
+    wakeLabel.textContent = "Tap once, then say \"Hey BlindSpot\"";
+  } else if (state === "listening") {
+    wakeLabel.textContent = "Say \"Hey BlindSpot\"…";
+  } else if (state === "command") {
+    wakeLabel.textContent = "Listening for your command…";
+  } else if (state === "processing") {
+    wakeLabel.textContent = "Processing…";
+  }
+}
+
+function findWakeWord(transcript) {
+  const lower = transcript.toLowerCase();
+  const variants = [
+    "hey blindspot", "hey blind spot", "hey blintspot",
+    "hey blinspot", "hey blinds pot", "hey blend spot",
+  ];
+  for (const phrase of variants) {
+    const idx = lower.indexOf(phrase);
+    if (idx !== -1) {
+      return transcript.slice(idx + phrase.length).trim();
+    }
+  }
+  return null;
+}
+
+function playConfirmBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [880, 1100].forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = "sine";
+      const t = ctx.currentTime + i * 0.13;
+      gain.gain.setValueAtTime(0.18, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+      osc.start(t);
+      osc.stop(t + 0.11);
+    });
+  } catch (e) { /* ignore — audio context may be blocked */ }
+}
+
+function startWakeWordListening() {
+  if (wakeListening || !audioUnlocked) return;
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return;
+
+  wakeRecognition = new SpeechRecognition();
+  wakeRecognition.continuous     = true;
+  wakeRecognition.interimResults = false;
+  wakeRecognition.lang           = "en-US";
+  wakeListening   = true;
+  awaitingCommand = false;
+  setWakeState("listening");
+
+  wakeRecognition.onresult = (event) => {
+    const transcript = event.results[event.results.length - 1][0].transcript.trim();
+
+    if (awaitingCommand) {
+      // Phase 2: we already heard "Hey BlindSpot", now capture the command
+      if (transcript) {
+        awaitingCommand = false;
+        triggerWakeWordAnalysis(transcript);
+      }
+      return;
+    }
+
+    // Phase 1: scan for wake phrase
+    const commandPart = findWakeWord(transcript);
+    if (commandPart !== null) {
+      playConfirmBeep();
+      if (commandPart) {
+        // Wake word + command in one utterance
+        triggerWakeWordAnalysis(commandPart);
+      } else {
+        // Wake word only — wait for command in next utterance
+        awaitingCommand = true;
+        setWakeState("command");
+      }
+    }
+  };
+
+  wakeRecognition.onend = () => {
+    wakeListening = false;
+    if (!micBtn.classList.contains("listening") && !isAnalyzing) {
+      setWakeState("idle");
+      wakeRestartTimer = setTimeout(startWakeWordListening, 600);
+    }
+  };
+
+  wakeRecognition.onerror = (e) => {
+    wakeListening = false;
+    if (e.error !== "aborted" && !micBtn.classList.contains("listening") && !isAnalyzing) {
+      wakeRestartTimer = setTimeout(startWakeWordListening, 1000);
+    }
+  };
+
+  try {
+    wakeRecognition.start();
+  } catch (e) {
+    wakeListening = false;
+    setWakeState("idle");
+  }
+}
+
+function stopWakeWordListening() {
+  clearTimeout(wakeRestartTimer);
+  wakeListening   = false;
+  awaitingCommand = false;
+  setWakeState("idle");
+  if (wakeRecognition) {
+    try { wakeRecognition.abort(); } catch (e) { /* ignore */ }
+    wakeRecognition = null;
+  }
+}
+
+function triggerWakeWordAnalysis(query) {
+  stopWakeWordListening();
+  setWakeState("processing");
+  queryInput.value = query;
+  setStatus(`Wake word: "${query}"`);
+  analyzeSnapshot(query);  // finally block restarts wake word listening
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function setResponse(text) { responseText.textContent = text; }

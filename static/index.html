@@ -4,16 +4,22 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>BlindSpot — AI Item Finder</title>
-  <link rel="stylesheet" href="/static/style.css?v=3" />
+  <link rel="stylesheet" href="/static/style.css?v=4" />
 </head>
 <body>
 
   <!-- Status bar -->
   <header class="status-bar" role="banner">
-    <div class="logo">BlindSpot</div>
-    <div class="privacy-badge" aria-live="polite">
-      <span class="privacy-dot"></span>
-      Privacy Mode Active — Text &amp; documents ignored
+    <div class="status-top">
+      <div class="logo">BlindSpot</div>
+      <div class="privacy-badge" aria-live="polite">
+        <span class="privacy-dot"></span>
+        Privacy Mode Active
+      </div>
+    </div>
+    <div id="wake-indicator" class="wake-indicator idle" aria-live="polite" aria-label="Wake word status">
+      <span class="wake-dot"></span>
+      <span id="wake-label">Tap once, then say "Hey BlindSpot"</span>
     </div>
   </header>
 
@@ -81,6 +87,6 @@
     </div>
   </section>
 
-  <script src="/static/app.js?v=3"></script>
+  <script src="/static/app.js?v=4"></script>
 </body>
 </html>
