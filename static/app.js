@@ -55,6 +55,9 @@ function unlockAudio() {
   }
 }
 
+// Unlock audio on any first tap anywhere — catches wake-word-only users
+document.addEventListener("click", () => unlockAudio(), { once: true });
+
 // ── Camera ─────────────────────────────────────────────────────────────────
 async function startCamera() {
   if (stream) {
