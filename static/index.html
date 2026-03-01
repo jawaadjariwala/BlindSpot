@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>BlindSpot — AI Item Finder</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- Status bar -->
+  <header class="status-bar" role="banner">
+    <div class="logo">BlindSpot</div>
+    <div class="privacy-badge" aria-live="polite">
+      <span class="privacy-dot"></span>
+      Privacy Mode Active — Text &amp; documents ignored
+    </div>
+  </header>
+
+  <!-- Camera viewfinder -->
+  <main class="viewfinder-container" aria-label="Camera viewfinder">
+    <video id="camera" autoplay playsinline muted aria-label="Live camera feed"></video>
+    <canvas id="snapshot-canvas" aria-hidden="true"></canvas>
+
+    <!-- Continuous mode overlay -->
+    <div id="scanning-overlay" class="scanning-overlay hidden" aria-live="polite" aria-label="Scanning status">
+      <div class="scan-pulse"></div>
+      <span id="scanning-label">Scanning…</span>
+    </div>
+  </main>
+
+  <!-- AI Response panel -->
+  <section class="response-panel" aria-label="AI guidance">
+    <div id="response-text" class="response-text" aria-live="assertive" aria-atomic="true">
+      Say what you're looking for to get started.
+    </div>
+    <div id="status-indicator" class="status-indicator" aria-live="polite"></div>
+  </section>
+
+  <!-- Controls -->
+  <section class="controls" aria-label="Controls">
+    <!-- Query input row -->
+    <div class="query-row">
+      <input
+        type="text"
+        id="query-input"
+        class="query-input"
+        placeholder='e.g. "I dropped my keys"'
+        aria-label="Describe what you are looking for"
+        autocomplete="off"
+      />
+      <button
+        id="mic-btn"
+        class="icon-btn"
+        aria-label="Use microphone to speak your query"
+        title="Voice input"
+      >🎤</button>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="action-row">
+      <button id="snap-btn" class="btn btn-primary" aria-label="Take a single snapshot and analyze">
+        📷 Analyze
+      </button>
+      <button id="continuous-btn" class="btn btn-secondary" aria-label="Start continuous scanning mode">
+        🔄 Start Scanning
+      </button>
+      <button id="camera-switch-btn" class="btn btn-ghost" aria-label="Switch between front and back camera">
+        🔃 Flip
+      </button>
+    </div>
+  </section>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
