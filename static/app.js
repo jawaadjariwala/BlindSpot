@@ -42,8 +42,6 @@ function unlockAudio() {
     audioEl.volume = 1;
     audioEl.src = "";
     audioUnlocked = true;
-    // Start wake word listening now that audio is unlocked
-    startWakeWordListening();
   }).catch(() => {
     // Unlock failed silently — will retry on next tap
   });
@@ -140,7 +138,7 @@ async function analyzeSnapshot(query) {
     isAnalyzing = false;
     snapBtn.disabled = false;
     // Restart wake word if it went quiet during analysis
-    if (audioUnlocked && !wakeListening && !micBtn.classList.contains("listening")) {
+    if (!wakeListening && !micBtn.classList.contains("listening")) {
       setTimeout(startWakeWordListening, 800);
     }
   }
@@ -251,7 +249,7 @@ function setupSpeechRecognition() {
       analyzeSnapshot(q); // finally block will restart wake word
     } else {
       // No query captured — restart wake word immediately
-      if (audioUnlocked) startWakeWordListening();
+      startWakeWordListening();
     }
   };
 }
@@ -348,7 +346,7 @@ let wakeRestartTimer = null;
 function setWakeState(state) {
   wakeIndicator.className = `wake-indicator ${state}`;
   if (state === "idle") {
-    wakeLabel.textContent = "Tap once, then say \"Hey BlindSpot\"";
+    wakeLabel.textContent = "Listening paused…";
   } else if (state === "listening") {
     wakeLabel.textContent = "Say \"Hey BlindSpot\"…";
   } else if (state === "command") {
@@ -363,6 +361,8 @@ function findWakeWord(transcript) {
   const variants = [
     "hey blindspot", "hey blind spot", "hey blintspot",
     "hey blinspot", "hey blinds pot", "hey blend spot",
+    "he blindspot", "he blind spot", "a blindspot", "a blind spot",
+    "blindspot",
   ];
   for (const phrase of variants) {
     const idx = lower.indexOf(phrase);
@@ -393,7 +393,7 @@ function playConfirmBeep() {
 }
 
 function startWakeWordListening() {
-  if (wakeListening || !audioUnlocked) return;
+  if (wakeListening) return;
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) return;
 
@@ -483,4 +483,6 @@ function setStatus(text)   { statusIndicator.textContent = text; }
   await startCamera();
   setupSpeechRecognition();
   if (window.speechSynthesis) speechSynthesis.onvoiceschanged = () => {};
+  // Start wake word immediately — mic permission prompt fires here
+  startWakeWordListening();
 })();
