@@ -123,4 +123,4 @@ This is enforced at the prompt level on every single API call, not as an afterth
 
 ## Built By
 
-Jawaad Jariwala — solo developer, HenHacks 2026
+Jawaad Jariwala — HenHacks 2026
