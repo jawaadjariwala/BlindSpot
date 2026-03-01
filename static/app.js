@@ -6,16 +6,19 @@ let isAnalyzing = false;
 let currentQuery = "";
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
-const video          = document.getElementById("camera");
-const canvas         = document.getElementById("snapshot-canvas");
-const responseText   = document.getElementById("response-text");
-const statusIndicator= document.getElementById("status-indicator");
-const queryInput     = document.getElementById("query-input");
-const micBtn         = document.getElementById("mic-btn");
-const snapBtn        = document.getElementById("snap-btn");
-const continuousBtn  = document.getElementById("continuous-btn");
-const cameraSwitchBtn= document.getElementById("camera-switch-btn");
-const scanningOverlay= document.getElementById("scanning-overlay");
+const video               = document.getElementById("camera");
+const canvas              = document.getElementById("snapshot-canvas");
+const responseText        = document.getElementById("response-text");
+const statusIndicator     = document.getElementById("status-indicator");
+const queryInput          = document.getElementById("query-input");
+const micBtn              = document.getElementById("mic-btn");
+const snapBtn             = document.getElementById("snap-btn");
+const continuousBtn       = document.getElementById("continuous-btn");
+const cameraSwitchBtn     = document.getElementById("camera-switch-btn");
+const scanningOverlay     = document.getElementById("scanning-overlay");
+const privacyAlert        = document.getElementById("privacy-alert");
+const privacyAlertDetail  = document.getElementById("privacy-alert-detail");
+const privacyAlertDismiss = document.getElementById("privacy-alert-dismiss");
 
 // ── iOS Audio unlock ───────────────────────────────────────────────────────
 // iOS blocks audio unless .play() is called on the SAME element that was
@@ -106,7 +109,18 @@ async function analyzeSnapshot(query) {
     }
 
     const data = await res.json();
-    const guidance = data.guidance;
+    const guidance        = data.guidance;
+    const privacyDetected = data.privacy_detected || false;
+    const privacyType     = data.privacy_type || "sensitive item";
+
+    // Privacy warning takes priority — speak it first, then guidance
+    if (privacyDetected) {
+      showPrivacyAlert(privacyType);
+      const warning = `Privacy alert: ${privacyType} detected in frame. Content has been ignored for your privacy. You may want to move it out of view.`;
+      await speakText(warning);
+    } else {
+      hidePrivacyAlert();
+    }
 
     setResponse(guidance);
     setStatus("✓ Analysis complete");
@@ -125,6 +139,8 @@ async function analyzeSnapshot(query) {
 }
 
 // ── Voice output ───────────────────────────────────────────────────────────
+// Both paths return a Promise that resolves only when audio FINISHES,
+// so sequential awaits play warning → then guidance without overlap.
 async function speakText(text) {
   // Try ElevenLabs first
   try {
@@ -138,8 +154,6 @@ async function speakText(text) {
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
 
-      // Reuse the persistent audioEl — required for iOS
-      // Revoke previous object URL if any
       if (audioEl._blobUrl) {
         URL.revokeObjectURL(audioEl._blobUrl);
         audioEl._blobUrl = null;
@@ -148,11 +162,16 @@ async function speakText(text) {
       audioEl.src = url;
       audioEl.volume = 1;
 
-      await audioEl.play();
-      audioEl.onended = () => {
-        URL.revokeObjectURL(url);
-        audioEl._blobUrl = null;
-      };
+      // Wait until playback ENDS, not just starts
+      await new Promise((resolve) => {
+        audioEl.onended = () => {
+          URL.revokeObjectURL(url);
+          audioEl._blobUrl = null;
+          resolve();
+        };
+        audioEl.onerror = () => resolve();
+        audioEl.play().catch(resolve);
+      });
       return;
     }
     console.warn("ElevenLabs unavailable, using browser TTS");
@@ -160,21 +179,26 @@ async function speakText(text) {
     console.warn("ElevenLabs failed, using browser TTS:", err.message);
   }
 
-  speakFallback(text);
+  await speakFallback(text);
 }
 
-function speakFallback(text) {
+async function speakFallback(text) {
   if (!window.speechSynthesis) return;
   speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate  = 0.92;
-  utterance.pitch = 1.0;
-  const voices = speechSynthesis.getVoices();
-  const preferred = voices.find(v =>
-    v.lang.startsWith("en") && (v.name.includes("Samantha") || v.name.includes("Google") || v.name.includes("Natural"))
-  );
-  if (preferred) utterance.voice = preferred;
-  speechSynthesis.speak(utterance);
+
+  await new Promise((resolve) => {
+    const utterance    = new SpeechSynthesisUtterance(text);
+    utterance.rate     = 0.92;
+    utterance.pitch    = 1.0;
+    utterance.onend    = resolve;   // resolves when speech FINISHES
+    utterance.onerror  = resolve;
+    const voices = speechSynthesis.getVoices();
+    const preferred = voices.find(v =>
+      v.lang.startsWith("en") && (v.name.includes("Samantha") || v.name.includes("Google") || v.name.includes("Natural"))
+    );
+    if (preferred) utterance.voice = preferred;
+    speechSynthesis.speak(utterance);
+  });
 }
 
 // ── Speech-to-text input ───────────────────────────────────────────────────
@@ -278,6 +302,28 @@ function stopContinuous() {
   scanningOverlay.classList.add("hidden");
   setStatus("Scanning stopped.");
 }
+
+// ── Privacy alert ──────────────────────────────────────────────────────────
+let privacyAlertTimer = null;
+
+function showPrivacyAlert(privacyType) {
+  const label = privacyType
+    ? privacyType.charAt(0).toUpperCase() + privacyType.slice(1) + " detected — content ignored for your privacy"
+    : "Sensitive item detected — content ignored for your privacy";
+  privacyAlertDetail.textContent = label;
+  privacyAlert.classList.remove("hidden");
+
+  // Auto-dismiss after 10 seconds
+  clearTimeout(privacyAlertTimer);
+  privacyAlertTimer = setTimeout(hidePrivacyAlert, 10000);
+}
+
+function hidePrivacyAlert() {
+  clearTimeout(privacyAlertTimer);
+  privacyAlert.classList.add("hidden");
+}
+
+privacyAlertDismiss.addEventListener("click", hidePrivacyAlert);
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function setResponse(text) { responseText.textContent = text; }

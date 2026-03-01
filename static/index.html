@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>BlindSpot — AI Item Finder</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v=3" />
 </head>
 <body>
 
@@ -26,6 +26,16 @@
     <div id="scanning-overlay" class="scanning-overlay hidden" aria-live="polite" aria-label="Scanning status">
       <div class="scan-pulse"></div>
       <span id="scanning-label">Scanning…</span>
+    </div>
+
+    <!-- Privacy alert banner (shown when sensitive item detected) -->
+    <div id="privacy-alert" class="privacy-alert hidden" role="alert" aria-live="assertive" aria-atomic="true">
+      <span class="privacy-alert-icon">🔴</span>
+      <div class="privacy-alert-body">
+        <strong>Privacy Alert</strong>
+        <span id="privacy-alert-detail">Sensitive item detected — content ignored</span>
+      </div>
+      <button id="privacy-alert-dismiss" class="privacy-alert-dismiss" aria-label="Dismiss privacy alert">✕</button>
     </div>
   </main>
 
@@ -71,6 +81,6 @@
     </div>
   </section>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=3"></script>
 </body>
 </html>

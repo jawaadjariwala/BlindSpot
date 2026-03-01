@@ -1,5 +1,6 @@
 import os
 import base64
+import json
 import logging
 from io import BytesIO
 
@@ -46,15 +47,24 @@ Your job:
 4. Give step-by-step guidance if the user needs to walk toward the item.
    Example: "Take about 3 small steps forward, then reach down to your left."
 
-CRITICAL PRIVACY RULES:
-- NEVER read, mention, or describe any text visible in the image (documents, screens, mail, cards, labels, etc.)
-- NEVER describe the content of any screens, monitors, or papers
-- If you see text or documents, completely ignore them as if they don't exist
-- Only focus on physical objects and spatial layout
-- Treat all text in the environment as invisible
+PRIVACY DETECTION — scan for these sensitive items:
+credit cards, debit cards, ID cards, driver's licenses, passports, documents with visible text,
+letters, mail envelopes, prescriptions, medical records, checks, bank statements, notebooks with
+handwriting, sticky notes, any screen displaying readable text (phone, laptop, monitor).
 
-Keep responses concise (2-3 sentences max). Be warm, patient, and encouraging.
-Speak naturally as if guiding a friend."""
+CRITICAL PRIVACY RULES:
+- NEVER read, mention, or describe any text content visible in the image
+- NEVER describe what is written on any document, card, or screen
+- Only focus on physical objects and spatial layout for guidance
+- If sensitive items are detected, set privacy_detected to true and name only the CATEGORY
+  (e.g. "credit card", "document", "prescription") — never the content
+
+Respond ONLY with a JSON object in this exact structure:
+{
+  "guidance": "2-3 sentence spatial guidance to find the requested item. Warm and encouraging.",
+  "privacy_detected": true or false,
+  "privacy_type": "category of sensitive item if detected, empty string if none"
+}"""
 
 
 class AnalyzeRequest(BaseModel):
@@ -106,11 +116,31 @@ async def analyze(req: AnalyzeRequest):
                     types.Part(text=f"The user is looking for: {req.query}"),
                 ])
             ],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema={
+                    "type": "object",
+                    "properties": {
+                        "guidance":         {"type": "string"},
+                        "privacy_detected": {"type": "boolean"},
+                        "privacy_type":     {"type": "string"},
+                    },
+                    "required": ["guidance", "privacy_detected", "privacy_type"],
+                },
+            ),
         )
 
-        guidance = response.text.strip()
-        logger.info(f"Gemini response: {guidance!r}")
-        return {"guidance": guidance}
+        result = json.loads(response.text)
+        guidance         = result.get("guidance", "").strip()
+        privacy_detected = result.get("privacy_detected", False)
+        privacy_type     = result.get("privacy_type", "").strip()
+
+        logger.info(f"Guidance: {guidance!r} | privacy_detected={privacy_detected} | type={privacy_type!r}")
+        return {
+            "guidance":         guidance,
+            "privacy_detected": privacy_detected,
+            "privacy_type":     privacy_type,
+        }
 
     except Exception as e:
         logger.error(f"Gemini error: {e}")
