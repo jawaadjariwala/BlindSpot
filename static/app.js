@@ -55,8 +55,11 @@ function unlockAudio() {
   }
 }
 
-// Unlock audio on any first tap anywhere — catches wake-word-only users
-document.addEventListener("click", () => unlockAudio(), { once: true });
+// Tap-to-start overlay — guarantees audio unlock before wake word can fire
+document.getElementById("start-overlay").addEventListener("click", function() {
+  unlockAudio();
+  this.style.display = "none";
+}, { once: true });
 
 // ── Camera ─────────────────────────────────────────────────────────────────
 async function startCamera() {
@@ -171,17 +174,20 @@ async function speakText(text) {
       audioEl.src = url;
       audioEl.volume = 1;
 
-      // Wait until playback ENDS, not just starts
-      await new Promise((resolve) => {
+      // Wait until playback ENDS — resolve(true) on success, resolve(false) if play blocked
+      const played = await new Promise((resolve) => {
         audioEl.onended = () => {
           URL.revokeObjectURL(url);
           audioEl._blobUrl = null;
-          resolve();
+          resolve(true);
         };
-        audioEl.onerror = () => resolve();
-        audioEl.play().catch(resolve);
+        audioEl.onerror = () => resolve(false);
+        audioEl.play().catch(() => resolve(false));
       });
-      return;
+      if (played) return;
+      // play() was blocked (audio not yet unlocked) — fall through to browser TTS
+      URL.revokeObjectURL(url);
+      audioEl._blobUrl = null;
     }
     console.warn("ElevenLabs unavailable, using browser TTS");
   } catch (err) {
