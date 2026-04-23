@@ -2,6 +2,8 @@
 
 **HenHacks 2026 · University of Delaware**
 
+🏆 **Winner — Best Community Impact Award, Rutgers Raptor Rise Pitch Competition**
+
 BlindSpot helps visually impaired people find lost or dropped items using their phone camera and AI. Point the camera, say what you're looking for, and BlindSpot guides you to it with natural voice directions — no human intermediary, no privacy risk.
 
 ---
@@ -111,6 +113,11 @@ BlindSpot's system prompt instructs Gemini to:
 This is enforced at the prompt level on every single API call, not as an afterthought.
 
 ---
+
+## Recognition
+
+- 🏆 **Best Community Impact Award** — Rutgers Raptor Rise Pitch Competition
+- Built for HenHacks 2026 at the University of Delaware
 
 ## Hackathon Categories
 
